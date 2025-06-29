@@ -53,14 +53,28 @@ class JSONLParser:
                     try:
                         entry = json.loads(line)
 
-                        # Check if this is a user message entry
+                        # Check if this is a user message entry (but not a tool result)
                         if (
                             entry.get("type") == "user"
                             and "message" in entry
                             and entry["message"].get("role") == "user"
+                            and "toolUseResult"
+                            not in entry  # Skip tool result messages
                         ):
                             content = entry["message"].get("content")
                             timestamp_str = entry.get("timestamp")
+
+                            # Skip if content contains only tool results
+                            if isinstance(content, list):
+                                # Check if all items are tool results
+                                is_tool_result_only = all(
+                                    isinstance(item, dict)
+                                    and item.get("type") == "tool_result"
+                                    for item in content
+                                    if isinstance(item, dict)
+                                )
+                                if is_tool_result_only:
+                                    continue
 
                             if isinstance(content, str):
                                 last_user_prompt = content
@@ -113,13 +127,28 @@ class JSONLParser:
                     try:
                         entry = json.loads(line)
 
-                        # Check if this is a user message entry
+                        # Check if this is a user message entry (but not a tool result)
                         if (
                             entry.get("type") == "user"
                             and "message" in entry
                             and entry["message"].get("role") == "user"
+                            and "toolUseResult"
+                            not in entry  # Skip tool result messages
                         ):
                             content = entry["message"].get("content")
+
+                            # Skip if content contains only tool results
+                            if isinstance(content, list):
+                                # Check if all items are tool results
+                                is_tool_result_only = all(
+                                    isinstance(item, dict)
+                                    and item.get("type") == "tool_result"
+                                    for item in content
+                                    if isinstance(item, dict)
+                                )
+                                if is_tool_result_only:
+                                    continue
+
                             if isinstance(content, str):
                                 last_user_prompt = content
                             elif isinstance(content, list):

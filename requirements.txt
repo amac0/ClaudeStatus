@@ -1,0 +1,24 @@
+# Claude Status Display Script Requirements
+# This project primarily uses Python standard library modules
+
+# No external runtime dependencies required
+# All functionality is built using Python 3.8+ standard library:
+# - argparse (command-line parsing)
+# - json (JSONL file parsing)
+# - pathlib (file path handling)
+# - subprocess (git command execution)
+# - datetime (timestamp parsing)
+# - typing (type hints)
+# - os, shutil, time (system utilities)
+
+# Development dependencies (optional)
+# Install with: pip install -r requirements.txt
+
+# Testing framework
+pytest>=6.0.0
+
+# Code formatting and linting
+ruff>=0.1.0
+
+# For running the complete development workflow
+# pip install pytest ruff

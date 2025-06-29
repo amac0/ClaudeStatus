@@ -139,3 +139,137 @@ class TestJSONLParser:
             todos = parser.get_latest_todo_list(f.name)
 
             assert todos is None
+
+    def test_extract_last_user_prompt_from_example2_jsonl(self):
+        """Test extracting the last user prompt from example2.jsonl, ignoring tool
+        results"""
+        example2_jsonl_path = Path(__file__).parent.parent / "example2.jsonl"
+        parser = JSONLParser()
+
+        last_prompt = parser.get_last_user_prompt(example2_jsonl_path)
+
+        # Should get the actual user prompt, not tool result messages
+        assert last_prompt is not None
+        assert "The two-line display needs to ensure" in last_prompt
+        assert "new-lines" in last_prompt
+
+    def test_extract_latest_todo_list_from_example2_jsonl(self):
+        """Test extracting todo list from example2.jsonl with timestamps"""
+        example2_jsonl_path = Path(__file__).parent.parent / "example2.jsonl"
+        parser = JSONLParser()
+
+        todos = parser.get_latest_todo_list(example2_jsonl_path)
+
+        # Should get the latest todo list
+        assert todos is not None
+        assert len(todos) >= 1
+        # Check for the test todos we expect
+        todo_contents = [todo["content"] for todo in todos]
+        assert any("Test two-line display" in content for content in todo_contents)
+
+    def test_extract_user_prompt_with_timestamp_example2_jsonl(self):
+        """Test extracting user prompt with timestamp from example2.jsonl"""
+        example2_jsonl_path = Path(__file__).parent.parent / "example2.jsonl"
+        parser = JSONLParser()
+
+        prompt, timestamp = parser.get_last_user_prompt_with_timestamp(
+            example2_jsonl_path
+        )
+
+        assert prompt is not None
+        assert timestamp is not None
+        assert "The two-line display needs to ensure" in prompt
+        # Timestamp should be from 2025-06-29T14:05:25.270Z
+        assert timestamp > 1700000000  # Reasonable timestamp check
+
+    def test_extract_todo_list_with_timestamp_example2_jsonl(self):
+        """Test extracting todo list with timestamp from example2.jsonl"""
+        example2_jsonl_path = Path(__file__).parent.parent / "example2.jsonl"
+        parser = JSONLParser()
+
+        todos, timestamp = parser.get_latest_todo_list_with_timestamp(
+            example2_jsonl_path
+        )
+
+        assert todos is not None
+        assert timestamp is not None
+        assert len(todos) >= 1
+        # Timestamp should be after the user prompt (2025-06-29T14:06:35.198Z)
+        assert timestamp > 1700000000  # Reasonable timestamp check
+
+    def test_ignore_tool_result_messages(self):
+        """Test that tool result messages are ignored when finding user prompts"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Write a real user message
+            real_user_message = {
+                "type": "user",
+                "message": {"role": "user", "content": "This is the real user prompt"},
+                "timestamp": "2025-06-29T14:05:25.270Z",
+            }
+            f.write(json.dumps(real_user_message) + "\n")
+
+            # Write a tool result message (should be ignored)
+            tool_result_message = {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "tool_use_id": "123",
+                            "type": "tool_result",
+                            "content": "tool output",
+                        }
+                    ],
+                },
+                "toolUseResult": {"stdout": "some output"},
+                "timestamp": "2025-06-29T14:06:35.284Z",
+            }
+            f.write(json.dumps(tool_result_message) + "\n")
+            f.flush()
+
+            parser = JSONLParser()
+            last_prompt = parser.get_last_user_prompt(f.name)
+
+            # Should get the real user prompt, not the tool result
+            assert last_prompt == "This is the real user prompt"
+
+    def test_ignore_tool_result_messages_with_timestamp(self):
+        """Test that tool result messages are ignored when finding user prompts with
+        timestamps"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Write a real user message
+            real_user_message = {
+                "type": "user",
+                "message": {"role": "user", "content": "This is the real user prompt"},
+                "timestamp": "2025-06-29T14:05:25.270Z",
+            }
+            f.write(json.dumps(real_user_message) + "\n")
+
+            # Write a tool result message (should be ignored)
+            tool_result_message = {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "tool_use_id": "123",
+                            "type": "tool_result",
+                            "content": "tool output",
+                        }
+                    ],
+                },
+                "toolUseResult": {"stdout": "some output"},
+                "timestamp": "2025-06-29T14:06:35.284Z",
+            }
+            f.write(json.dumps(tool_result_message) + "\n")
+            f.flush()
+
+            parser = JSONLParser()
+            prompt, timestamp = parser.get_last_user_prompt_with_timestamp(f.name)
+
+            # Should get the real user prompt and its timestamp, not the tool result
+            assert prompt == "This is the real user prompt"
+            assert timestamp is not None
+            # Should be the timestamp from the real message, not the tool result
+            expected_timestamp = parser._parse_timestamp("2025-06-29T14:05:25.270Z")
+            assert abs(timestamp - expected_timestamp) < 1  # Within 1 second

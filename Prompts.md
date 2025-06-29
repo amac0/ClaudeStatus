@@ -18,3 +18,13 @@ Make the following changes to the output.
 "Last User Prompt:" -> "Current Prompt ({minutes} minutes ago):"
 "Git Status: Last commit:" -> "Last Commit ({minutes} minutes ago)"
 "Todo Status:" -> "Last Todos ({minutes} minutes ago)"
+
+Make the following changes to the output.
+"Current Prompt (1 minutes ago): -> "Prompt (1 minutes ago):"
+"Last Commit (1 minutes ago):" -> "Commit (1 minutes ago):"
+"Last Todos:" -> "Todos:"
+
+Also, if there are no todos found, please just omit the todos entirely (don't display "no todos"). In both the regular and two-line display.
+
+The two-line display needs to ensure that none of its output from the prompt,
+todos or git have new-lines. Those should be converted to spaces.

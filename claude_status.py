@@ -218,64 +218,70 @@ def display_status(
             git_message = "Git repository (no commits)"
 
     # Format labels with time information and colors
-    prompt_label = f"{Colors.CYAN}Current Prompt"
+    prompt_label = f"{Colors.CYAN}Prompt"
     if prompt_minutes_ago is not None:
         prompt_label += f" ({prompt_minutes_ago} minutes ago)"
     prompt_label += f"{Colors.RESET}"
 
-    git_label = f"{Colors.CYAN}Last Commit"
+    git_label = f"{Colors.CYAN}Commit"
     if git_minutes_ago is not None:
         git_label += f" ({git_minutes_ago} minutes ago)"
     git_label += f"{Colors.RESET}"
 
-    todos_label = f"{Colors.CYAN}Last Todos"
+    todos_label = f"{Colors.CYAN}Todos"
     if todos_minutes_ago is not None:
         todos_label += f" ({todos_minutes_ago} minutes ago)"
     todos_label += f"{Colors.RESET}"
 
     if two_line:
         # Two-line format: prompt on first line, todo --- commit on second line
-        # First line: prompt (only truncate if needed)
-        line1 = last_prompt
+        # First line: prompt (convert newlines to spaces, only truncate if needed)
+        line1 = last_prompt.replace("\n", " ").replace("\r", " ")
         if len(line1) > terminal_width:
             line1 = line1[: terminal_width - 3] + "..."
 
-        # Second line: checkbox + todo --- commit message
+        # Second line: checkbox + todo --- commit message (or just commit if no todos)
         # Use the same filtered todos logic as multi-line format
         if todos and show_todos:
             current_todo_text, is_completed = get_current_todo_with_status(todos)
+            # Convert newlines to spaces in todo text
+            current_todo_text = current_todo_text.replace("\n", " ").replace("\r", " ")
             checkbox = "[x]" if is_completed else "[ ]"
             todo_with_checkbox = f"{checkbox} {current_todo_text}"
+
+            # Build second line with separator (convert newlines in git message)
+            separator = " --- "
+            clean_git_message = git_message.replace("\n", " ").replace("\r", " ")
+            line2_parts = [todo_with_checkbox, clean_git_message]
+
+            # Try to fit without truncation first
+            line2_full = separator.join(line2_parts)
+
+            if len(line2_full) <= terminal_width:
+                # Fits without truncation
+                line2 = line2_full
+            else:
+                # Need to truncate - calculate available space for each part
+                separator_space = len(separator)
+                available_space = terminal_width - separator_space
+                part_space = available_space // 2
+
+                # Truncate parts only if they exceed their allocated space
+                truncated_parts = []
+                for part in line2_parts:
+                    if len(part) > part_space:
+                        truncated_parts.append(part[: part_space - 3] + "...")
+                    else:
+                        truncated_parts.append(part)
+
+                line2 = separator.join(truncated_parts)
+
+                # Final safety check
+                if len(line2) > terminal_width:
+                    line2 = line2[: terminal_width - 3] + "..."
         else:
-            todo_with_checkbox = "[ ] No todos"
-
-        # Build second line with separator
-        separator = " --- "
-        line2_parts = [todo_with_checkbox, git_message]
-
-        # Try to fit without truncation first
-        line2_full = separator.join(line2_parts)
-
-        if len(line2_full) <= terminal_width:
-            # Fits without truncation
-            line2 = line2_full
-        else:
-            # Need to truncate - calculate available space for each part
-            separator_space = len(separator)
-            available_space = terminal_width - separator_space
-            part_space = available_space // 2
-
-            # Truncate parts only if they exceed their allocated space
-            truncated_parts = []
-            for part in line2_parts:
-                if len(part) > part_space:
-                    truncated_parts.append(part[: part_space - 3] + "...")
-                else:
-                    truncated_parts.append(part)
-
-            line2 = separator.join(truncated_parts)
-
-            # Final safety check
+            # No todos to show - just display the commit message (convert newlines)
+            line2 = git_message.replace("\n", " ").replace("\r", " ")
             if len(line2) > terminal_width:
                 line2 = line2[: terminal_width - 3] + "..."
 
@@ -285,13 +291,16 @@ def display_status(
         # Multi-line format with colors
         print(f"{prompt_label}: {last_prompt}")
         print(f"{git_label}: {git_message}")
-        if "\n" in todos_info:
-            # Multi-line todo display
-            print(f"{todos_label}:")
-            print(todos_info)
-        else:
-            # Single line todo display
-            print(f"{todos_label}: {todos_info}")
+
+        # Only display todos section if there are todos to show
+        if show_todos and todos and todos_info != "No todos found":
+            if "\n" in todos_info:
+                # Multi-line todo display
+                print(f"{todos_label}:")
+                print(todos_info)
+            else:
+                # Single line todo display
+                print(f"{todos_label}: {todos_info}")
 
 
 def main():
@@ -311,8 +320,12 @@ def main():
     )
     parser.add_argument(
         "--update",
-        action="store_true",
-        help="Continuously update status display until interrupted",
+        nargs="?",
+        const=5,
+        type=int,
+        metavar="SECONDS",
+        help="Continuously update status display until interrupted "
+        "(default: 5 seconds)",
     )
 
     args = parser.parse_args()
@@ -323,9 +336,17 @@ def main():
     else:
         jsonl_path = get_default_jsonl_path()
 
-    if args.update:
+    if args.update is not None:
+        # Update mode with configurable interval
+        update_interval = args.update
         try:
             while True:
+                # Check for newer JSONL file if using auto-detection
+                if not args.file:
+                    current_jsonl_path = get_default_jsonl_path()
+                    if current_jsonl_path != jsonl_path:
+                        jsonl_path = current_jsonl_path
+
                 # Clear screen and display status
                 if not args.two_line:
                     os.system("clear" if os.name == "posix" else "cls")  # nosec B605
@@ -336,9 +357,12 @@ def main():
                     # For two-line mode, just refresh in place
                     print("\r", end="")
                 else:
-                    print("\n--- Refreshing in 5 seconds (Ctrl+C to exit) ---")
+                    interval_text = (
+                        f"{update_interval} second{'s' if update_interval != 1 else ''}"
+                    )
+                    print(f"\n--- Refreshing in {interval_text} (Ctrl+C to exit) ---")
 
-                time.sleep(5)
+                time.sleep(update_interval)
         except KeyboardInterrupt:
             if not args.two_line:
                 print("\nExiting...")
