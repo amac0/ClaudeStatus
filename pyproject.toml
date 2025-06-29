@@ -1,0 +1,11 @@
+[tool.ruff]
+extend-select = ["I"]    # enable isort-style rules
+fixable       = ["I"]    # let Ruff apply them
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
