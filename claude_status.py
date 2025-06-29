@@ -171,6 +171,7 @@ def display_status(
     prompt_minutes_ago = None
     todos_minutes_ago = None
     git_minutes_ago = None
+    show_todos = False
 
     if jsonl_path and jsonl_path.exists():
         # Get prompt with timestamp from JSONL entries
@@ -184,11 +185,26 @@ def display_status(
 
         # Get todos with timestamp from JSONL entries
         todos, todos_timestamp = parser.get_latest_todo_list_with_timestamp(jsonl_path)
-        if todos:
+
+        # Only show todos if they were created after the last user prompt
+        show_todos = False
+        if todos and todos_timestamp and prompt_timestamp:
+            # Show todos only if they're newer than or same time as the last user prompt
+            if todos_timestamp >= prompt_timestamp:
+                show_todos = True
+        elif todos and not prompt_timestamp:
+            # If no user prompt timestamp, show todos
+            show_todos = True
+
+        if show_todos and todos:
             # Use detailed format for multi-line, summary for two-line
             todos_info = format_todo_status(todos, detailed=not two_line)
             if todos_timestamp:
                 todos_minutes_ago = get_minutes_ago(todos_timestamp)
+        else:
+            # Don't show todos - they're older than the last user prompt
+            # Keep todos for two-line format logic, but mark as not showing
+            todos_info = "No todos found"
 
     if git.is_git_repository():
         commit_msg = git.get_last_commit_message()
@@ -225,7 +241,8 @@ def display_status(
             line1 = line1[: terminal_width - 3] + "..."
 
         # Second line: checkbox + todo --- commit message
-        if todos:
+        # Use the same filtered todos logic as multi-line format
+        if todos and show_todos:
             current_todo_text, is_completed = get_current_todo_with_status(todos)
             checkbox = "[x]" if is_completed else "[ ]"
             todo_with_checkbox = f"{checkbox} {current_todo_text}"
