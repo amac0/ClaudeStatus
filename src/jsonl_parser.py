@@ -3,7 +3,7 @@
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 
 class JSONLParser:
@@ -62,3 +62,64 @@ class JSONLParser:
             return None
 
         return last_user_prompt
+
+    def get_latest_todo_list(self, jsonl_path: str | Path) -> Optional[List[dict]]:
+        """Extract the latest todo list from a JSONL file
+
+        Args:
+            jsonl_path: Path to the JSONL file
+
+        Returns:
+            The latest todo list, or None if no todo lists found
+        """
+        jsonl_path = Path(jsonl_path)
+        if not jsonl_path.exists():
+            return None
+
+        latest_todos = None
+
+        try:
+            with open(jsonl_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    try:
+                        entry = json.loads(line)
+
+                        # Check if this is an assistant message with tool usage
+                        if (
+                            entry.get("type") == "assistant"
+                            and "message" in entry
+                            and entry["message"].get("role") == "assistant"
+                        ):
+                            content = entry["message"].get("content", [])
+                            if isinstance(content, list):
+                                for item in content:
+                                    if (
+                                        isinstance(item, dict)
+                                        and item.get("type") == "tool_use"
+                                        and item.get("name") == "TodoWrite"
+                                    ):
+                                        input_data = item.get("input", {})
+                                        todos = input_data.get("todos")
+                                        if todos and isinstance(todos, list):
+                                            latest_todos = todos
+
+                        # Also check for tool result with todo data
+                        elif entry.get("type") == "user" and "toolUseResult" in entry:
+                            tool_result = entry["toolUseResult"]
+                            if isinstance(tool_result, dict):
+                                new_todos = tool_result.get("newTodos")
+                                if new_todos and isinstance(new_todos, list):
+                                    latest_todos = new_todos
+
+                    except json.JSONDecodeError:
+                        # Skip malformed JSON lines
+                        continue
+
+        except (IOError, OSError):
+            return None
+
+        return latest_todos

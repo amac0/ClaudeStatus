@@ -62,3 +62,80 @@ class TestJSONLParser:
             last_prompt = parser.get_last_user_prompt(f.name)
 
             assert last_prompt is None
+
+    def test_extract_latest_todo_list_from_example_jsonl(self):
+        """Test extracting the latest todo list from example.jsonl"""
+        example_jsonl_path = Path(__file__).parent.parent / "example.jsonl"
+        parser = JSONLParser()
+
+        todos = parser.get_latest_todo_list(example_jsonl_path)
+
+        # Should get the final completed todo list from the example
+        assert todos is not None
+        assert len(todos) == 4
+        assert all(todo["status"] == "completed" for todo in todos)
+        assert any("Explore codebase structure" in todo["content"] for todo in todos)
+        assert any(
+            "Create comprehensive CLAUDE.md" in todo["content"] for todo in todos
+        )
+
+    def test_extract_latest_todo_list_simple_jsonl(self):
+        """Test extracting todo list from a simple JSONL file"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Write a TodoWrite tool usage
+            todo_message = {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "TodoWrite",
+                            "input": {
+                                "todos": [
+                                    {
+                                        "id": "1",
+                                        "content": "Write test",
+                                        "status": "completed",
+                                        "priority": "high",
+                                    },
+                                    {
+                                        "id": "2",
+                                        "content": "Write code",
+                                        "status": "in_progress",
+                                        "priority": "medium",
+                                    },
+                                ]
+                            },
+                        }
+                    ],
+                },
+            }
+            f.write(json.dumps(todo_message) + "\n")
+            f.flush()
+
+            parser = JSONLParser()
+            todos = parser.get_latest_todo_list(f.name)
+
+            assert todos is not None
+            assert len(todos) == 2
+            assert todos[0]["content"] == "Write test"
+            assert todos[0]["status"] == "completed"
+            assert todos[1]["content"] == "Write code"
+            assert todos[1]["status"] == "in_progress"
+
+    def test_extract_latest_todo_list_no_todos(self):
+        """Test behavior when no todo lists exist"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Write only user messages
+            user_message = {
+                "type": "user",
+                "message": {"role": "user", "content": "Hello"},
+            }
+            f.write(json.dumps(user_message) + "\n")
+            f.flush()
+
+            parser = JSONLParser()
+            todos = parser.get_latest_todo_list(f.name)
+
+            assert todos is None
