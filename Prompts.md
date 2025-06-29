@@ -12,3 +12,9 @@ In the @example.jsonl you will find that the last user prompt was "Do not do any
 The script should have a few command-line flags: "file" which changes the location of the projects jsonl file (use that for testing with @example.jsonl); "one-line" which truncates the status to be displayed on one terminal line (varying based on the terminal width); and "update" which will run the script and keep it displaying the current status over time until exited.
 
 Take a moment now to come up with a plan to implement this script. Implement test driven development. That means FIRST write a test that the script needs to pass based on the functional requirements above and then write the code so that the test passes. To develop your plan, iterate based on the smallest reasonable chunks of testing/coding and commit each step of the way. Plan your implementation steps in order to get to runnable and useful code ASAP so that I can also see the status. Use your todo list tool to be able to track what you have done and what is still left to do. If you have questions about implementation or testing, please ask me.
+
+Extra scratch space:
+Make the following changes to the output.
+"Last User Prompt:" -> "Current Prompt ({minutes} minutes ago):"
+"Git Status: Last commit:" -> "Last Commit ({minutes} minutes ago)"
+"Todo Status:" -> "Last Todos ({minutes} minutes ago)"
