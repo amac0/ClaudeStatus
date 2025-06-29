@@ -28,3 +28,5 @@ Also, if there are no todos found, please just omit the todos entirely (don't di
 
 The two-line display needs to ensure that none of its output from the prompt,
 todos or git have new-lines. Those should be converted to spaces.
+
+Ensure that any requirements are in a requirements.txt doc. Also, write a detailed Readme.md that gives the various user use cases.
